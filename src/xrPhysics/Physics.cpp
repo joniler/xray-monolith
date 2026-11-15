@@ -107,10 +107,15 @@ IC void add_contact_body_effector(dBodyID body, const dContact& c, SGameMtl* mat
 // placed into the player, props spawned inside each other, an object squeezed against a frozen one - are
 // then fired apart at tens of m/s (a crate spawned inside the player threw the player 11 m up). Clamping
 // the depth stored in the contact caps that velocity; the overlap is still resolved, just over a few
-// steps. Approach speed and bounce are untouched, so real impacts and thrown objects keep their force.
-// This also bounds the character's step-up (FootProcess raises the contact depth to lift the foot onto
-// a step) for steps onto objects; level geometry goes through CollideStatic and is not affected.
-IC static void LimitDepenetration(dContact& c, CPHIsland* world)
+// steps. This also bounds the character's step-up (FootProcess raises the contact depth to lift the foot
+// onto a step) for steps onto objects; level geometry goes through CollideStatic and is not affected.
+//
+// Impacts are left alone: on soft contacts (the characters use spring/damper contacts) the depth term is
+// also the spring force that stops an incoming object, and clamping it let a thrown barrel sink through
+// the actor and hit twice. Bodies approaching each other faster than twice the limit keep the full depth.
+// body_1/body_2 belong to c.geom.g1/g2 (0 for level geometry or a fixed body); moving body 1 along the
+// normal separates them.
+IC static void LimitDepenetration(dContact& c, CPHIsland* world, dBodyID body_1, dBodyID body_2)
 {
 	if (ph_depenetration_vel <= 0.f)
 		return;
@@ -119,8 +124,20 @@ IC static void LimitDepenetration(dContact& c, CPHIsland* world)
 	if (k <= 0.f)
 		return;
 	const dReal max_depth = dWorldGetContactSurfaceLayer(world->DWorld()) + ph_depenetration_vel / k;
-	if (c.geom.depth > max_depth)
-		c.geom.depth = max_depth;
+	if (c.geom.depth <= max_depth)
+		return;
+
+	dVector3 v1 = {0.f, 0.f, 0.f}, v2 = {0.f, 0.f, 0.f};
+	if (body_1)
+		dBodyGetPointVel(body_1, c.geom.pos[0], c.geom.pos[1], c.geom.pos[2], v1);
+	if (body_2)
+		dBodyGetPointVel(body_2, c.geom.pos[0], c.geom.pos[1], c.geom.pos[2], v2);
+	const dReal separating_vel = (v1[0] - v2[0]) * c.geom.normal[0] + (v1[1] - v2[1]) * c.geom.normal[1] +
+		(v1[2] - v2[2]) * c.geom.normal[2];
+	if (separating_vel < -2.f * ph_depenetration_vel)
+		return;
+
+	c.geom.depth = max_depth;
 }
 
 // Creates contact joints between o1 and o2. Joints that couple two movable bodies are connected to
@@ -351,7 +368,7 @@ IC static int CollideIntoGroup(dGeomID o1, dGeomID o2, dJointGroupID jointGroup,
 			if( debug_output().ph_dbg_draw_mask().test(phDbgDrawContacts) )
 				debug_output().DBG_DrawContact(c);
 #endif
-			LimitDepenetration(c, world);
+			LimitDepenetration(c, world, body_1, body_2);
 			dJointID contact_joint = dJointCreateContact(0, jointGroup, &c);
 			contact_island->ConnectJoint(contact_joint);
 			dJointAttach(contact_joint, body_1, body_2);

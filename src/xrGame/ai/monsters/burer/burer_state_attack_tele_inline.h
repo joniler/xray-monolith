@@ -224,6 +224,24 @@ void CStateBurerAttackTele<Object>::FindFreeObjects(xr_vector<CObject*>& tpObjec
 	}
 }
 
+// Objects the burer holds can be destroyed in the middle of an attack (released by a script, picked up,
+// blown up). The state keeps raw pointers to them, so forget them here; ExecuteTeleFire used to call
+// into the freed object and crash.
+template <typename Object>
+void CStateBurerAttackTele<Object>::remove_links(CObject* object)
+{
+	inherited::remove_links(object);
+
+	CPhysicsShellHolder* const holder = smart_cast<CPhysicsShellHolder*>(object);
+	if (!holder)
+		return;
+
+	if (selected_object == holder)
+		selected_object = nullptr;
+
+	tele_objects.erase(std::remove(tele_objects.begin(), tele_objects.end(), holder), tele_objects.end());
+}
+
 template <typename Object>
 void CStateBurerAttackTele<Object>::FindObjects()
 {
@@ -352,6 +370,10 @@ void CStateBurerAttackTele<Object>::ExecuteTeleContinue()
 template <typename Object>
 void CStateBurerAttackTele<Object>::ExecuteTeleFire()
 {
+	// the object was destroyed after it was selected (see remove_links)
+	if (!selected_object)
+		return;
+
     CEntityAlive* const enemy = const_cast<CEntityAlive*>(object->EnemyMan.get_enemy());
 	const Fvector enemy_pos = get_head_position(enemy);
 
