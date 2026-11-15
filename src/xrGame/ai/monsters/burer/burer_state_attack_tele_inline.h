@@ -289,7 +289,9 @@ void CStateBurerAttackTele<Object>::FireAllToEnemy()
 		float const dist_to_enemy = cur_object->Position().distance_to(enemy_pos);
 		float const fire_time = dist_to_enemy / object->m_tele_fly_velocity;
 
-        SCollisionHitCallback* const hit_callback = is_actor ? xr_new<SCollisionHitCallback>(object) : nullptr;
+        ICollisionHitCallback* const hit_callback = is_actor
+            ? xr_new<CTeleProjectileHitCallback>(object->ID(), object->m_tele_collision_damage, iFloor(fire_time * 1000.f) + 1500)
+            : nullptr;
         cur_object->set_collision_hit_callback(hit_callback);
 		object->CTelekinesis::fire_t(cur_object, enemy_pos, fire_time);
 
@@ -356,7 +358,9 @@ void CStateBurerAttackTele<Object>::ExecuteTeleFire()
 	float const dist_to_enemy = selected_object->Position().distance_to(enemy_pos);
 	float const fire_time = dist_to_enemy / object->m_tele_fly_velocity;
 
-    SCollisionHitCallback* const hit_callback = enemy->cast_actor() ? xr_new<SCollisionHitCallback>(object) : nullptr;
+    ICollisionHitCallback* const hit_callback = enemy->cast_actor()
+        ? xr_new<CTeleProjectileHitCallback>(object->ID(), object->m_tele_collision_damage, iFloor(fire_time * 1000.f) + 1500)
+        : nullptr;
     selected_object->set_collision_hit_callback(hit_callback);
 	object->CTelekinesis::fire_t(selected_object, enemy_pos, fire_time);
 

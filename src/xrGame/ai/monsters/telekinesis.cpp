@@ -2,6 +2,41 @@
 #include "telekinesis.h"
 #include "../../entity_alive.h"
 #include "../../../xrphysics/PhysicsShell.h"
+#include "../../../xrphysics/IColisiondamageInfo.h"
+#include "../../level.h"
+
+CTeleProjectileHitCallback::CTeleProjectileHitCallback(u16 monster_id, float min_damage, u32 lifetime_ms)
+	: m_monster_id(monster_id), m_min_damage(min_damage), m_expire_time(Device.dwTimeGlobal + lifetime_ms), m_done(false)
+{
+}
+
+void CTeleProjectileHitCallback::call(CObject*& obj, float min_cs, float max_cs, float& cs, float& hl,
+                                      ICollisionDamageInfo* di)
+{
+	if (m_done)
+		return;
+
+	if (Device.dwTimeGlobal > m_expire_time)
+	{
+		m_done = true;
+		return;
+	}
+
+	// A graze or a slow touch: keep the hit for the actual impact.
+	if (cs <= min_cs * 0.5f)
+		return;
+
+	m_done = true;
+
+	CObject* const monster = Level().Objects.net_Find(m_monster_id);
+	if (monster && !monster->getDestroy())
+		obj = monster;
+
+	if (hl < m_min_damage)
+		hl = m_min_damage;
+
+	di->SetInitiated();
+}
 
 CTelekinesis::CTelekinesis()
 {

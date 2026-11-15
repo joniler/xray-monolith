@@ -287,38 +287,6 @@ bool CPolterTele::tele_raise_objects()
 	return false;
 }
 
-struct SCollisionHitCallback :
-	public ICollisionHitCallback
-
-{
-	//	CollisionHitCallbackFun				*m_collision_hit_callback																																						;
-	CPoltergeist* m_object;
-	float m_pmt_object_collision_damage;
-    bool done = false;
-
-	SCollisionHitCallback(CPoltergeist* obj, float pmt_object_collision_damage):
-		m_object(obj), m_pmt_object_collision_damage(pmt_object_collision_damage)
-	{
-		VERIFY(obj);
-	}
-
-	void call(CObject*& obj, float min_cs, float max_cs, float& cs, float& hl, ICollisionDamageInfo* di) override
-	{
-        if (done) return;
-        done = true;
-
-        obj = nullptr;
-
-        if (cs > min_cs * 0.5f)
-        {
-            hl = m_pmt_object_collision_damage;
-            obj = m_object;
-        }
-
-		di->SetInitiated();
-	}
-};
-
 void CPolterTele::tele_fire_objects()
 {
 	for (u32 i = 0; i < m_object->CTelekinesis::get_objects_total_count(); i++)
@@ -332,7 +300,10 @@ void CPolterTele::tele_fire_objects()
 
             const Fvector enemy_pos = get_head_position(Actor());
             const float fire_time = hobj->Position().distance_to(enemy_pos) / m_pmt_fly_velocity;
-			hobj->set_collision_hit_callback(xr_new<SCollisionHitCallback>(m_object, m_pmt_object_collision_damage));
+			// Tele_Collision_Damage is the least a hit costs; heavy objects can do more (it used to replace
+			// the collision damage, which made a thrown crate hurt less than one falling on the actor)
+			hobj->set_collision_hit_callback(xr_new<CTeleProjectileHitCallback>(
+				m_object->ID(), m_pmt_object_collision_damage, iFloor(fire_time * 1000.f) + 1500));
 			m_object->CTelekinesis::fire_t(hobj, enemy_pos, fire_time);
 			return;
 		}

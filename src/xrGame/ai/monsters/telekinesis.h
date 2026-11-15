@@ -2,6 +2,24 @@
 
 #include "telekinetic_object.h"
 #include "../../../xrphysics/PHUpdateObject.h"
+#include "../../../xrphysics/IPhysicsShellHolder.h"
+
+// Collision hit callback for an object a monster throws at the actor. The first real impact on the actor is
+// credited to the monster and costs the actor at least min_damage health; a heavy, fast object can do more,
+// as computed by the collision damage. A graze (or the object resting against the actor) does not use up the
+// hit, and once the throw is over the object is an ordinary object again. The monster is kept by id because it
+// can be destroyed while the object is still in the air.
+class CTeleProjectileHitCallback : public ICollisionHitCallback
+{
+	u16 m_monster_id;
+	float m_min_damage;
+	u32 m_expire_time;
+	bool m_done;
+
+public:
+	CTeleProjectileHitCallback(u16 monster_id, float min_damage, u32 lifetime_ms);
+	void call(CObject*& obj, float min_cs, float max_cs, float& cs, float& hl, ICollisionDamageInfo* di) override;
+};
 
 
 class CTelekinesis : public CPHUpdateObject

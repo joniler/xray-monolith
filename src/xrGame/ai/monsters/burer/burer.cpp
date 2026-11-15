@@ -142,6 +142,7 @@ void CBurer::Load(LPCSTR section)
 	m_tele_raise_speed = READ_IF_EXISTS(pSettings, r_float, section, "tele_raise_speed", 5.f);
 	m_tele_fly_velocity = READ_IF_EXISTS(pSettings, r_float, section, "tele_fly_velocity", 30.f);
 	m_tele_object_height = READ_IF_EXISTS(pSettings, r_float, section, "tele_object_height", 2.f);
+	m_tele_collision_damage = READ_IF_EXISTS(pSettings, r_float, section, "Tele_Collision_Damage", 0.f);
 
 	particle_fire_shield = pSettings->r_string(section, "Particle_Shield");
 
@@ -392,6 +393,10 @@ void CBurer::UpdateGraviObject()
 
 		CInventoryItem* itm = smart_cast<CInventoryItem*>(obj);
 		if (itm && itm->IsQuestItem()) continue;
+
+		if (std::find(m_gravi_object.pushed.begin(), m_gravi_object.pushed.end(), obj->ID()) != m_gravi_object.pushed.end())
+			continue;
+		m_gravi_object.pushed.push_back(obj->ID());
 
 		Fvector dir;
 		dir.sub(obj->Position(), m_gravi_object.cur_pos);

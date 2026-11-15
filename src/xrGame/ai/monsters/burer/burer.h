@@ -33,6 +33,10 @@ public:
 
 		const CEntityAlive* enemy;
 
+		// objects this wave has already pushed: the wave moves in steps smaller than its radius, and pushing
+		// an object again at every step stacked the impulse (crates flew off at over 130 m/s)
+		xr_vector<u16> pushed;
+
 		GraviObject()
 		{
 			time_last_update = 0;
@@ -49,6 +53,7 @@ public:
 			target_pos = tp;
 			time_last_update = Device.dwTimeGlobal;
 			enemy = e;
+			pushed.clear();
 		}
 
 		void deactivate()
@@ -104,6 +109,7 @@ public:
 	float m_tele_raise_speed;
 	float m_tele_fly_velocity;
 	float m_tele_object_height;
+	float m_tele_collision_damage; // least health a thrown object takes from the actor on a hit, 0 = collision damage only
 
 	float m_weight_to_stamina_hit;
 	float m_weapon_drop_stamina_k;
