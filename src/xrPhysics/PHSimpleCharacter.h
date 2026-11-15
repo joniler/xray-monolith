@@ -48,6 +48,7 @@ protected:
 		ALife::EHitType m_hit_type;
 		bool is_initiated;
 		mutable float m_contact_velocity;
+		SCollisionDamageDbgInfo m_dbg;
 	};
 #ifdef	DEBUG
 	SCollisionDamageInfo& dbg_get_collision_dmg_info(){ return m_collision_damage_info ;}
@@ -165,6 +166,7 @@ public:
 	virtual ICollisionDamageInfo* CollisionDamageInfo() { return this; }
 private:
 	virtual float ContactVelocity() const { return m_collision_damage_info.ContactVelocity(); }
+	virtual void GetDbgInfo(SCollisionDamageDbgInfo& info) const { info = m_collision_damage_info.m_dbg; }
 	virtual void HitDir(Fvector& dir) const { return m_collision_damage_info.HitDir(dir); }
 	virtual const Fvector& HitPos() const { return m_collision_damage_info.HitPos(); }
 	virtual u16 DamageInitiatorID() const;

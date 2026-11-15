@@ -288,6 +288,7 @@ public:
 private:
 	void actor_calculate(Fvector& vAccel, const Fvector& camDir, float ang_speed, float jump, float dt, bool bLight);
 	void UpdateCollisionDamage();
+	void LogCollisionDamage(float physics_health_lost);
 	bool MakeJumpPath(xr_vector<DetailPathManager::STravelPathPoint>& out_path, u32& travel_point, Fvector& dist_to_enemy);
 };
 

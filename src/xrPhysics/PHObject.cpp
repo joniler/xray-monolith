@@ -189,8 +189,9 @@ void CPHObject::step_prediction(float time)
 
 bool CPHObject::step_single(dReal step)
 {
+	m_flags.set(st_fixed_contact,FALSE);
 	CollideDynamics();
-	bool ret = !m_island.IsObjGroun();
+	bool ret = !m_island.IsObjGroun() && !m_flags.test(st_fixed_contact);
 	if (ret)
 	{
 		//PhTune							(step);
@@ -198,8 +199,9 @@ bool CPHObject::step_single(dReal step)
 		reinit_single();
 		//PhDataUpdate					(step);
 		spatial_move();
+		m_flags.set(st_fixed_contact,FALSE);
 		CollideDynamics();
-		ret = !m_island.IsObjGroun();
+		ret = !m_island.IsObjGroun() && !m_flags.test(st_fixed_contact);
 	}
 	reinit_single();
 	return ret;
@@ -217,8 +219,9 @@ void CPHObject::step(float time)
 
 bool CPHObject::DoCollideObj()
 {
+	m_flags.set(st_fixed_contact,FALSE);
 	CollideDynamics();
-	bool ret = m_island.IsObjGroun();
+	bool ret = m_island.IsObjGroun() || !!m_flags.test(st_fixed_contact);
 	reinit_single();
 	return ret;
 }

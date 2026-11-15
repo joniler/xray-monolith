@@ -99,14 +99,29 @@ IC void add_contact_body_effector(dBodyID body, const dContact& c, SGameMtl* mat
 }
 
 
+// Creates contact joints between o1 and o2. Joints that couple two movable bodies are connected to
+// `world`, and their number is returned: the caller has to merge the islands of both objects.
+//
+// A contact against a fixed body (see BodySetFixed) is attached to the movable body only, as if the
+// fixed body were level geometry - the same treatment PHJoint gives fixed elements (body_for_joint).
+// It is connected to the island of the object that owns the movable body, so it does not merge islands:
+// frozen furniture no longer pulls everything touching it into one island (island bloat, collisions
+// dropped at the island limits, 1e8 kg mass ratios in the solver) and is not woken by every touch.
+// obj1/obj2 own o1/o2; dSpaceCollide2 does not keep the argument order, so c.geom.g1 may belong to
+// either of them and the owner is looked up from the geom user data. When obj1/obj2 are not given
+// or the owner is unknown, the contact is created the old way (two-sided, connected to `world`).
+// One-sided contacts connected to island2 are counted in *obj2_contacts: the caller has to make sure
+// obj2 is active so that island is stepped.
 IC static int CollideIntoGroup(dGeomID o1, dGeomID o2, dJointGroupID jointGroup, CPHIsland* world,
-                               const int& MAX_CONTACTS)
+                               const int& MAX_CONTACTS, CPHObject* obj1 = NULL, CPHObject* obj2 = NULL,
+                               CPHIsland* island2 = NULL, int* obj2_contacts = NULL)
 {
 	const int RS = 800 + 10;
 	const int N = RS;
 
 	static dContact contacts[RS];
 	int collided_contacts = 0;
+	int coupled_contacts = 0;
 	// get the contacts up to a maximum of N contacts
 	int n;
 
@@ -269,17 +284,55 @@ IC static int CollideIntoGroup(dGeomID o1, dGeomID o2, dJointGroupID jointGroup,
 			surface.mu = flt_max;
 		if (do_collide && collided_contacts < MAX_CONTACTS)
 		{
+			dBodyID body_1 = dGeomGetBody(g1);
+			dBodyID body_2 = dGeomGetBody(g2);
+			const bool fixed_1 = body_1 && BodyIsFixed(body_1);
+			const bool fixed_2 = body_2 && BodyIsFixed(body_2);
+
+			// neither side can move (fixed vs fixed, fixed vs static): there is nothing to solve
+			if ((fixed_1 || !body_1) && (fixed_2 || !body_2))
+				continue;
+
+			CPHIsland* contact_island = world;
+			bool coupled = true;
+			if (fixed_1 != fixed_2)
+			{
+				// exactly one side is fixed and the other side is a movable body
+				dxGeomUserData* free_data = fixed_1 ? usr_data_2 : usr_data_1;
+				CPHObject* free_owner = free_data ? free_data->ph_object : NULL;
+				if (free_owner && free_owner == obj1)
+				{
+					coupled = false;
+				}
+				else if (free_owner && free_owner == obj2 && island2 && obj2_contacts)
+				{
+					contact_island = island2;
+					coupled = false;
+					++(*obj2_contacts);
+				}
+				if (!coupled)
+				{
+					if (fixed_1)
+						body_1 = 0;
+					else
+						body_2 = 0;
+					free_owner->MarkFixedContact();
+				}
+			}
+
 			++collided_contacts;
+			if (coupled)
+				++coupled_contacts;
 #ifdef DEBUG
 			if( debug_output().ph_dbg_draw_mask().test(phDbgDrawContacts) )
 				debug_output().DBG_DrawContact(c);
 #endif
 			dJointID contact_joint = dJointCreateContact(0, jointGroup, &c);
-			world->ConnectJoint(contact_joint);
-			dJointAttach(contact_joint, dGeomGetBody(g1), dGeomGetBody(g2));
+			contact_island->ConnectJoint(contact_joint);
+			dJointAttach(contact_joint, body_1, body_2);
 		}
 	}
-	return collided_contacts;
+	return coupled_contacts;
 }
 
 void NearCallback(CPHObject* obj1, CPHObject* obj2, dGeomID o1, dGeomID o2)
@@ -289,10 +342,16 @@ void NearCallback(CPHObject* obj1, CPHObject* obj2, dGeomID o1, dGeomID o2)
 	obj2->near_callback(obj1);
 	int MAX_CONTACTS = -1;
 	if (!island1->CanMerge(island2, MAX_CONTACTS)) return;
-	if (CollideIntoGroup(o1, o2, ContactGroup, island1, MAX_CONTACTS) != 0)
+	int obj2_contacts = 0;
+	if (CollideIntoGroup(o1, o2, ContactGroup, island1, MAX_CONTACTS, obj1, obj2, island2, &obj2_contacts) != 0)
 	{
 		obj1->MergeIsland(obj2);
 		if (!obj2->is_active())obj2->EnableObject(obj1);
+	}
+	else if (obj2_contacts != 0 && !obj2->is_active())
+	{
+		// only one-sided contacts against a fixed body of obj1: no merge, but obj2's island must be stepped
+		obj2->EnableObject(obj1);
 	}
 }
 
@@ -407,6 +466,22 @@ void FixBody(dBodyID body, float ext_param, float mass_param)
 	dBodySetAngularVel(body, 0, 0, 0);
 	dBodySetForce(body, 0, 0, 0);
 	dBodySetTorque(body, 0, 0, 0);
+	BodySetFixed(body, true);
+}
+
+void BodySetFixed(dBodyID body, bool fixed)
+{
+	VERIFY(body);
+	if (fixed)
+		body->flags |= dxBodyXRFixed;
+	else
+		body->flags &= ~dxBodyXRFixed;
+}
+
+bool BodyIsFixed(dBodyID body)
+{
+	VERIFY(body);
+	return !!(body->flags & dxBodyXRFixed);
 }
 
 void FixBody(dBodyID body)

@@ -161,10 +161,13 @@ void CPHMovementControl::Calculate(Fvector& vAccel, const Fvector& camDir, float
 	gcontact_Was = m_character->ContactWas();
 
 	UpdateCollisionDamage();
+	const float physics_health_lost = gcontact_HealthLost;
 
 	ICollisionDamageInfo* cdi = CollisionDamageInfo();
 	if (cdi->HitCallback())
 		cdi->HitCallback()->call(gcontact_Initiator, fMinCrashSpeed, fMaxCrashSpeed, fContactSpeed, gcontact_HealthLost, cdi);
+
+	LogCollisionDamage(physics_health_lost);
 
 	TraceBorder(previous_position);
 	CheckEnvironment(vPosition);
@@ -199,6 +202,51 @@ void CPHMovementControl::UpdateCollisionDamage()
 		VERIFY(m_character);
 		m_character->SetHitType(DefineCollisionHitType(m_character->LastMaterialIDX()));
 	}
+}
+
+// ph_log_collision_damage: 0 - off, 1 - log every collision hit that deals damage,
+// 2 - also log impacts from moving objects above half the crash speed that deal none
+int ph_log_collision_damage = 0;
+
+void CPHMovementControl::LogCollisionDamage(float physics_health_lost)
+{
+	if (!ph_log_collision_damage || !m_character || !m_character->b_exist)
+		return;
+
+	const ICollisionDamageInfo* cdi = m_character->CollisionDamageInfo();
+	SCollisionDamageDbgInfo dbg;
+	cdi->GetDbgInfo(dbg);
+
+	const bool damaging = !fis_zero(gcontact_HealthLost);
+	const bool near_miss = ph_log_collision_damage > 1 && dbg.from_object && fContactSpeed > fMinCrashSpeed * 0.5f;
+	if (!damaging && !near_miss)
+		return;
+
+	CObject* source = dbg.source_id != u16(-1) ? Level().Objects.net_Find(dbg.source_id) : nullptr;
+	LPCSTR source_name = source ? source->cName().c_str() : "?";
+	LPCSTR source_section = source ? source->cNameSect().c_str() : "?";
+
+	string512 source_desc;
+	if (dbg.from_object)
+		xr_sprintf(source_desc, "moving object '%s' [%s] id %u, mass %.2f kg, v_self %.2f v_obj %.2f m/s, energy %.1f J",
+		           source_name, source_section, u32(dbg.source_id), dbg.source_mass, dbg.self_normal_vel,
+		           dbg.source_normal_vel, dbg.accepted_energy);
+	else if (dbg.source_id != u16(-1))
+		xr_sprintf(source_desc, "own motion into %sobject '%s' [%s] id %u, v_self %.2f m/s",
+		           dbg.source_fixed ? "fixed " : "", source_name, source_section, u32(dbg.source_id),
+		           dbg.self_normal_vel);
+	else
+		xr_sprintf(source_desc, "level geometry, v_self %.2f m/s", dbg.self_normal_vel);
+
+	string256 callback_desc = "";
+	if (cdi->HitCallback())
+		xr_sprintf(callback_desc, " | hit callback (thrown object), initiator '%s'",
+		           gcontact_Initiator ? gcontact_Initiator->cName().c_str() : "none");
+
+	Msg("[ph_dmg] %s: hit power %.3f (physics %.3f) | contact %.2f m/s, crash %.2f..%.2f | %s | material '%s' x%.2f%s",
+	    pObject ? pObject->cName().c_str() : "?", gcontact_HealthLost, physics_health_lost, fContactSpeed,
+	    fMinCrashSpeed, fMaxCrashSpeed, source_desc, dbg.material_name ? dbg.material_name : "", dbg.material_factor,
+	    callback_desc);
 }
 
 #include <ai/monsters/basemonster/base_monster.h>
@@ -414,6 +462,7 @@ void CPHMovementControl::Calculate(const xr_vector<DetailPathManager::STravelPat
 	gcontact_Was = m_character->ContactWas();
 
 	UpdateCollisionDamage();
+	LogCollisionDamage(gcontact_HealthLost);
 
 	CheckEnvironment(vPosition);
 	bSleep = false;

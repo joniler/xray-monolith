@@ -72,6 +72,8 @@ string_path g_last_saved_game;
 extern float air_resistance_epsilon;
 #endif // #ifdef DEBUG
 
+extern int ph_log_collision_damage;
+
 extern void show_smart_cast_stats();
 extern void clear_smart_cast_stats();
 extern void release_smart_cast_stats();
@@ -2728,6 +2730,7 @@ void CCC_RegisterCommands()
 	// Physics
 	CMD1(CCC_PHFps, "ph_frequency");
 	CMD1(CCC_PHIterations, "ph_iterations");
+	CMD4(CCC_Integer, "ph_log_collision_damage", &ph_log_collision_damage, 0, 2);
 
 #ifdef DEBUG
 	CMD1(CCC_PHGravity, "ph_gravity");

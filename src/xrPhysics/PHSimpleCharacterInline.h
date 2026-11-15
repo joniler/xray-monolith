@@ -23,6 +23,12 @@ void CPHSimpleCharacter::UpdateStaticDamage(dContact* c, SGameMtl* tri_material,
 		m_collision_damage_info.m_damege_contact = *c;
 		//m_collision_damage_info.m_object			=	0;
 		m_collision_damage_info.m_obj_id = u16(-1);
+
+		SCollisionDamageDbgInfo& dbg = m_collision_damage_info.m_dbg;
+		dbg.reset();
+		dbg.self_normal_vel = norm_prg;
+		dbg.material_factor = tri_material->fBounceDamageFactor;
+		dbg.material_name = *tri_material->m_Name;
 	}
 }
 
@@ -30,6 +36,13 @@ void CPHSimpleCharacter::UpdateDynamicDamage(dContact* c, u16 obj_material_idx, 
 {
 	//if(ph_world ->IsFreezed())
 	//return;
+
+	// A fixed (frozen) body cannot move, so running or falling into it is the same as hitting level
+	// geometry, which UpdateStaticDamage already accounts for. Its fix mass (fix_mass_param, 1e8 kg)
+	// must not enter the energy balance below: any solver drift of such a body turns into a lethal hit.
+	if (BodyIsFixed(b))
+		return;
+
 	const dReal* vel = dBodyGetLinearVel(m_body);
 	dReal c_vel;
 	dMass m;
@@ -63,9 +76,9 @@ void CPHSimpleCharacter::UpdateDynamicDamage(dContact* c, u16 obj_material_idx, 
 	dReal KK = Pcnorm * Pcnorm / (m_mass + m.mass) / 2.f;
 	dReal accepted_energy = Kself * m_collision_damage_factor + Kobj * object_damage_factor - KK;
 	//DeltaK=m1*m2*(v1-v2)^2/(2*(m1+m2))
+	SGameMtl* obj_material = GMLibrary().GetMaterialByIdx(obj_material_idx);
 	if (accepted_energy > 0.f)
 	{
-		SGameMtl* obj_material = GMLibrary().GetMaterialByIdx(obj_material_idx);
 		c_vel = dSqrt(accepted_energy/m_mass*2.f) * obj_material->fBounceDamageFactor;
 	}
 	else c_vel = 0.f;
@@ -133,6 +146,17 @@ void CPHSimpleCharacter::UpdateDynamicDamage(dContact* c, u16 obj_material_idx, 
 			m_collision_damage_info.m_damege_contact = *c;
 			m_collision_damage_info.m_hit_callback = obj->ObjectGetCollisionHitCallback();
 			m_collision_damage_info.m_obj_id = obj->ObjectID();
+
+			SCollisionDamageDbgInfo& dbg = m_collision_damage_info.m_dbg;
+			dbg.reset();
+			dbg.from_object = true;
+			dbg.source_id = obj->ObjectID();
+			dbg.source_mass = m.mass;
+			dbg.self_normal_vel = norm_vel;
+			dbg.source_normal_vel = norm_obj_vel;
+			dbg.accepted_energy = accepted_energy;
+			dbg.material_factor = obj_material->fBounceDamageFactor;
+			dbg.material_name = *obj_material->m_Name;
 		}
 	}
 }

@@ -27,6 +27,10 @@ void ApplyGravityAccel(dBodyID body, const dReal* accel);
 const dReal fix_ext_param = 10000.f;
 const dReal fix_mass_param = 100000000.f;
 void FixBody(dBodyID body);
+// A fixed body (CPHElement::Fix, e.g. a shell frozen by script) is immovable: contacts treat it
+// as static world, the same way PHJoint treats fixed elements, and it is not a collision damage source.
+void BodySetFixed(dBodyID body, bool fixed);
+bool BodyIsFixed(dBodyID body);
 void dMassSub(dMass* a, const dMass* b);
 void SaveContacts(dGeomID o1, dGeomID o2, dJointGroupID jointGroup);
 const dReal* dJointGetPositionContact(dJointID joint);

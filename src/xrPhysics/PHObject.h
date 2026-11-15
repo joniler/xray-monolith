@@ -35,7 +35,10 @@ class CPHObject :
 		st_net_interpolation =(1 << 3),
 		fl_ray_motions =(1 << 4),
 		st_recently_deactivated =(1 << 5),
-		is_deadbody =(1 << 6)
+		is_deadbody =(1 << 6),
+		// got a one-sided contact against a fixed body (see CollideIntoGroup) in the current collision pass;
+		// such contacts do not grow the island, so DoCollideObj/step_single check this flag as well
+		st_fixed_contact =(1 << 7)
 	};
 
 	CPHIsland m_island;
@@ -69,6 +72,7 @@ protected:
 	CPHObject* SelfPointer() { return this; }
 public:
 	IC BOOL IsRayMotion() { return m_flags.test(fl_ray_motions); }
+	void MarkFixedContact() { m_flags.set(st_fixed_contact,TRUE); }
 	void IslandReinit() { m_island.Unmerge(); }
 	void IslandStep(dReal step) { m_island.Step(step); }
 	void MergeIsland(CPHObject* obj) { m_island.Merge(&obj->m_island); }

@@ -1691,7 +1691,17 @@ void CPHSimpleCharacter::InitContact(dContact* c, bool& do_collide, u16 material
 		MulSprDmp(c->surface.soft_cfm, c->surface.soft_erp, spring_rate, soft_param);
 		c->surface.mu *= (1.f + b_clamb_jump * 3.f) * m_friction_factor;
 	}
+	const float prev_contact_velocity = m_collision_damage_info.m_contact_velocity;
 	UpdateStaticDamage(c, tri_material, bo1);
+	if (object && m_collision_damage_info.m_contact_velocity > prev_contact_velocity)
+	{
+		// own motion into an object is the strongest contact so far: note the object for the damage log
+		IPhysicsShellHolder* obj = bo1 ? retrieveRefObject(c->geom.g2) : retrieveRefObject(c->geom.g1);
+		dBodyID other_body = bo1 ? dGeomGetBody(c->geom.g2) : dGeomGetBody(c->geom.g1);
+		SCollisionDamageDbgInfo& dbg = m_collision_damage_info.m_dbg;
+		dbg.source_id = obj ? obj->ObjectID() : u16(-1);
+		dbg.source_fixed = other_body && BodyIsFixed(other_body);
+	}
 }
 
 void CPHSimpleCharacter::FootProcess(dContact* c, bool& do_collide, bool bo)

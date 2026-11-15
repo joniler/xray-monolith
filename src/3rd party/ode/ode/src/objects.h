@@ -39,7 +39,8 @@ enum {
   dxBodyFlagFiniteRotationAxis = 2,	// use finite rotations only along axis
   dxBodyDisabled = 4,			// body is disabled
   dxBodyNoGravity = 8,			// body is not influenced by gravity
-  dxBodyAutoDisable = 16		// enable auto-disable on body
+  dxBodyAutoDisable = 16,		// enable auto-disable on body
+  dxBodyXRFixed = 1024			// X-Ray: body belongs to a fixed (frozen) element; contacts treat it as static world
 };
 
 
