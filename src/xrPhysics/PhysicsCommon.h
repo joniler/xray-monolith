@@ -29,6 +29,7 @@ extern const u16 max_joint_allowed_for_forced_exact_integration;
 extern XRPHYSICS_API const float default_world_gravity;
 extern XRPHYSICS_API float phTimefactor;
 extern XRPHYSICS_API int phIterations;
+extern XRPHYSICS_API float ph_depenetration_vel;
 //extern	float		phBreakCommonFactor								;
 //extern	float		phRigidBreakWeaponFactor						;
 //extern	float		ph_tri_query_ex_aabb_rate						;

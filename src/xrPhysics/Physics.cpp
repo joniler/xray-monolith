@@ -58,6 +58,9 @@ const float default_world_gravity = 2 * 9.81f;
 
 int phIterations = 18;
 float phTimefactor = 1.f;
+// Upper limit (m/s) for the velocity contacts between objects use to push overlapping bodies apart.
+// 0 disables the limit. See LimitDepenetration.
+float ph_depenetration_vel = 3.f;
 //float		phBreakCommonFactor										= 0.01f;
 //float		phRigidBreakWeaponFactor								= 1.f;
 Fbox phBoundaries = {1000.f, 1000.f, -1000.f, -1000.f};
@@ -98,6 +101,27 @@ IC void add_contact_body_effector(dBodyID body, const dContact& c, SGameMtl* mat
 	}
 }
 
+
+// ODE resolves an overlap with a correcting velocity of erp/step * (depth - surface layer), and the
+// world's limit for it (contactp.max_vel) is infinite. Bodies that start out deeply overlapping - furniture
+// placed into the player, props spawned inside each other, an object squeezed against a frozen one - are
+// then fired apart at tens of m/s (a crate spawned inside the player threw the player 11 m up). Clamping
+// the depth stored in the contact caps that velocity; the overlap is still resolved, just over a few
+// steps. Approach speed and bounce are untouched, so real impacts and thrown objects keep their force.
+// This also bounds the character's step-up (FootProcess raises the contact depth to lift the foot onto
+// a step) for steps onto objects; level geometry goes through CollideStatic and is not affected.
+IC static void LimitDepenetration(dContact& c, CPHIsland* world)
+{
+	if (ph_depenetration_vel <= 0.f)
+		return;
+	const dReal erp = (c.surface.mode & dContactSoftERP) ? c.surface.soft_erp : dWorldGetERP(world->DWorld());
+	const dReal k = erp / fixed_step;
+	if (k <= 0.f)
+		return;
+	const dReal max_depth = dWorldGetContactSurfaceLayer(world->DWorld()) + ph_depenetration_vel / k;
+	if (c.geom.depth > max_depth)
+		c.geom.depth = max_depth;
+}
 
 // Creates contact joints between o1 and o2. Joints that couple two movable bodies are connected to
 // `world`, and their number is returned: the caller has to merge the islands of both objects.
@@ -327,6 +351,7 @@ IC static int CollideIntoGroup(dGeomID o1, dGeomID o2, dJointGroupID jointGroup,
 			if( debug_output().ph_dbg_draw_mask().test(phDbgDrawContacts) )
 				debug_output().DBG_DrawContact(c);
 #endif
+			LimitDepenetration(c, world);
 			dJointID contact_joint = dJointCreateContact(0, jointGroup, &c);
 			contact_island->ConnectJoint(contact_joint);
 			dJointAttach(contact_joint, body_1, body_2);

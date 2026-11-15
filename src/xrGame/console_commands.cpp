@@ -2730,6 +2730,7 @@ void CCC_RegisterCommands()
 	CMD1(CCC_PHFps, "ph_frequency");
 	CMD1(CCC_PHIterations, "ph_iterations");
 	CMD4(CCC_Integer, "ph_log_collision_damage", &ph_log_collision_damage, 0, 2);
+	CMD4(CCC_Float, "ph_depenetration_vel", &ph_depenetration_vel, 0.f, 100.f);
 
 #ifdef DEBUG
 	CMD1(CCC_PHGravity, "ph_gravity");
