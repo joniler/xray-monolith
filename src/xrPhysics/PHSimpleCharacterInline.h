@@ -76,6 +76,19 @@ void CPHSimpleCharacter::UpdateDynamicDamage(dContact* c, u16 obj_material_idx, 
 	dReal KK = Pcnorm * Pcnorm / (m_mass + m.mass) / 2.f;
 	dReal accepted_energy = Kself * m_collision_damage_factor + Kobj * object_damage_factor - KK;
 	//DeltaK=m1*m2*(v1-v2)^2/(2*(m1+m2))
+
+	// The balance above is taken in the world frame. With object_damage_factor > 1 (1.2^2 in system.ltx)
+	// the extra part of the object's kinetic energy does not cancel against KK, so a heavy object that
+	// moves together with the character hits it with no relative motion at all: the character standing
+	// on a 4 t table that settles at 4 m/s took a 17 m/s impact (placeable furniture is 1-10 t). The same
+	// balance in the character's rest frame depends only on the relative velocity, and is equal to the
+	// world-frame value while the character stands still (thrown objects, mutant telekinesis), so the
+	// smaller of the two is used.
+	const dReal rel_norm_vel = norm_obj_vel - norm_vel;
+	const dReal accepted_in_own_frame = rel_norm_vel * rel_norm_vel * m.mass / 2.f *
+		(object_damage_factor - m.mass / (m_mass + m.mass));
+	if (accepted_in_own_frame < accepted_energy)
+		accepted_energy = accepted_in_own_frame;
 	SGameMtl* obj_material = GMLibrary().GetMaterialByIdx(obj_material_idx);
 	if (accepted_energy > 0.f)
 	{
